@@ -1,123 +1,137 @@
-# 🔍 Enhanced Account Intelligence App
-
-An AI-powered web research tool that delivers actionable account intelligence, with **clickable links to all sources** for maximum traceability and insight validation.
 
 ---
 
-## Features
+# 🔍 How to Build an AI-Powered Enhanced Account Intelligence App with Clickable Source Links
 
-### 🚀 AI-Driven Account Intelligence
+In today's data-driven world, sales and research teams need actionable account intelligence fast and reliably. Imagine an AI-powered web research tool that not only scrapes company websites but also analyzes the data, scores its relevance, and generates actionable insights — complete with clickable links to every source for full traceability.
 
-- **Automated Insights Table**: Get key intelligence (Recent Hires, Funding, Growth, Initiatives, Senior Management, Account Intelligence) packaged in a **clear, traceable markdown table with clickable source links**.
-- **Enterprise-Ready LLM Integration**: Uses Azure OpenAI and a tailored prompting strategy to extract, evaluate, and summarize insights from scraped web pages and news.
-
-### 🌐 Smart Web & Company Site Scraper
-
-- **Web Scraping with Context**: Pulls and parses relevant company website sections (news, press, careers, about, IR). Automatically discovers and categorizes pages likely to contain intelligence.
-- **Safe and Robust**: Gracefully handles and reports errors for unreachable or problematic web pages.
-
-### 💡 Relevance Evaluation
-
-- **LLM-Powered Content Analysis**: Each scraped page is rated for relevance and value for your research goals; unhelpful sources are deprioritized.
-- **Customizable Requirements**: User can define their intelligence needs (e.g., "Growth Insights," "Recent Initiatives," "Buyer Intent") and get only the most relevant info.
-
-### 📊 User-Friendly Intelligence Reports
-
-- **Interactive Next-Gen Table**: All results are rendered as a markdown table or clickable pandas dataframe (Streamlit), so you can instantly verify every fact.
-- **Expandable URL Explorer**: See all discovered and categorized URLs for manual review.
-
-### 🔒 Secure & Configurable
-
-- **.env Support**: Credentials and API endpoints read from environment variables.
-- **Streamlit Frontend**: Clean, beautiful, efficient online interface for your intelligence workflow.
+Welcome to the **Enhanced Account Intelligence App**.
 
 ---
 
-## Installation
+## 🚀 What Is the Enhanced Account Intelligence App?
 
-1. **Clone the repo:**
-```bash
+This web app leverages Azure OpenAI, advanced web scraping techniques, and an elegant Streamlit interface to deliver enterprise-ready intelligence reports. It helps researchers generate meaningful insights on companies such as recent hires, funding news, growth trends, and more — by simply providing company names, search topics, and URLs.
+
+---
+
+## 🌟 Key Features
+
+### 1️⃣ AI-Driven Account Intelligence
+- Automated insights summarized into a traceable markdown table.
+- Uses Azure OpenAI to analyze scraped content intelligently.
+- Delivers relevance scoring and recommendations per source.
+
+### 2️⃣ Smart Web & Company Site Scraper
+- Scrapes and parses key sections (news, press, careers).
+- Auto-discovers relevant URLs.
+- Handles errors gracefully, ensuring robust scraping.
+
+### 3️⃣ Relevance Evaluation
+- Each page is rated for its relevance to your research needs.
+- Customizable intelligence goals (e.g., "Growth Insights," "Recent Hires").
+
+### 4️⃣ User-Friendly Reports
+- Interactive markdown tables or pandas DataFrame views in Streamlit.
+- Clickable URLs for verifying all sources.
+- Expandable URL explorer for manual URL review.
+
+### 5️⃣ Secure and Configurable
+- API keys managed through .env.
+- Streamlit frontend for a clean, efficient experience.
+
+---
+
+## ⚙️ Installation Guide
+
+### 1️⃣ Clone the Repository
+\`\`\`bash
 git clone https://github.com/naveen161101/Projects.git
 cd Enhanced Account Intelligence App
+\`\`\`
 
-2. **Install dependencies:**  
+### 2️⃣ Install Dependencies
 Python 3.8+ is recommended.
 
+\`\`\`bash
 pip install -r requirements.txt
+\`\`\`
 
-text
-
-3. **Setup environment variables:**  
-Create a `.env` file with your Azure OpenAI info:
-
+### 3️⃣ Configure Environment Variables
+Create a .env file:
+\`\`\`
 AZURE_OPENAI_API_KEY=your-key
 AZURE_OPENAI_API_BASE=https://your-endpoint.openai.azure.com/
 AZURE_OPENAI_DEPLOYMENT_NAME=your-deployment
 AZURE_OPENAI_API_VERSION=2023-03-15-preview
+\`\`\`
 
-text
-
-4. **Run the App:**
-
+### 4️⃣ Run the App
+\`\`\`bash
 streamlit run app.py
-
-or whatever the main file is named
-text
+\`\`\`
 
 ---
 
-## Usage
+## 🧱 How It Works
 
-1. **Describe Your Need**: Enter company name, country, research topic (e.g., NEWS), search queries (e.g., "Recent Hires"), and intelligence requirements (e.g., "Growth Insights, Buyer Intent").
-2. **Add URLs** *(optional)*: Enter official company URLs or news/press page links for deep analysis.
-3. **Review Results**:  
-- Clickable URLs to **verify every source**.
-- Expandable panel for all discovered relevant company URLs.
-
----
-
-## Example Output
-
-| Insight Type            | Recommended Source                                              | Reason                                         |
-|-------------------------|---------------------------------------------------------------|------------------------------------------------|
-| Recent Hires            | Company Website - https://example.com/careers                 | High relevance for hiring news                 |
-| Growth Insights         | BusinessWire - https://businesswire.com/news/company-growth   | Direct recent growth coverage                  |
+- **Web Scraping**: Automatically scrapes the company's official pages and discovers relevant URLs.
+- **URL Categorization**: Automatically categorizes URLs (e.g., News, Careers).
+- **LLM Relevance Scoring**: Azure OpenAI analyzes content against user requirements.
+- **Insight Table Generation**: Generates a table showing insights with clickable sources.
+- **Interactive UI**: Presents an intuitive Streamlit interface to interact with insights.
 
 ---
 
-## How It Works
+## 🎯 Example Output
 
-1. **Web Scraping**: Collects main site and important company webpage text.
-2. **URL Discovery**: Auto-extracts and categorizes news/investor/press/careers/company info pages.
-3. **LLM Relevance Scoring**: Every page is summarized and scored for user-specified insight types by Azure OpenAI.
-4. **Results Table**: Highlights best-matching insight types with recommended sources; all links are **clickable** and reasoned.
-5. **Streamlit UI**: Presents insights in an interactive, user-friendly table.
-
----
-
-## Key Files
-
-- `app.py` (or main file): Entrypoint, Streamlit UI logic.
-- `WebResearcher` class: Scrapes, discovers URLs, and categories.
-- `IntelligenceAgent` class: LLM-based relevance analysis, insight extraction, table generation.
-- `.env`: API credentials (never check into GitHub!).
+| Insight Type    | Recommended Source                                 | Reason                             |
+| --------------- | -------------------------------------------------- | ---------------------------------- |
+| Recent Hires    | [Company Careers](https://example.com/careers)     | High relevance for new hires       |
+| Growth Insights | [BusinessWire News](https://businesswire.com/news) | Detailed coverage of recent growth |
 
 ---
 
-## Attributions
+## ⚡ Example Usage Flow
 
-- [Streamlit](https://streamlit.io/) for ultra-fast web UIs.
+- Enter company details: name, country, research topic.
+- Specify search queries like "Recent Initiatives" or "New Hires."
+- Optionally provide official URLs.
+- View generated table with clickable source links.
+- Expand discovered URL explorer to manually check other resources.
+
+---
+
+## 🧱 Architecture Overview
+
+- **app.py**: Entry point, Streamlit-based UI.
+- **WebResearcher class**: Handles web scraping and URL discovery.
+- **IntelligenceAgent class**: Uses Azure OpenAI for relevance scoring and table generation.
+
+---
+
+## 🛠 Attributions
+
+- [Streamlit](https://streamlit.io/) for web UI.
 - [BeautifulSoup](https://www.crummy.com/software/BeautifulSoup/) for HTML parsing.
-- [OpenAI](https://openai.com/) & [Azure Cognitive Services](https://azure.microsoft.com/en-us/products/cognitive-services/openai-service/) for state-of-the-art language models.
+- [OpenAI Azure API](https://azure.microsoft.com/en-us/products/cognitive-services/openai-service/) for LLM-based analysis.
 
 ---
 
-## License
+## 📚 License
 
-This project is for educational and research use. For commercial use or custom licensing, please contact the author.
+Educational and research use only. For commercial use, contact the author.
 
 ---
 
-## Support
+## 💡 Support
 
-Feel free to open issues or PRs for improvements!
+Found an issue or want to contribute? Feel free to open issues or PRs in the GitHub repo.
+
+---
+
+This app empowers researchers and analysts to turn unstructured web data into actionable, reliable insights with full traceability.
+
+👉 Ready to boost your account intelligence workflow? Check out the [GitHub repository](https://github.com/naveen161101/Projects) and start exploring now.
+
+---
