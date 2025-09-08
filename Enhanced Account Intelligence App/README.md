@@ -45,31 +45,31 @@ This web app leverages Azure OpenAI, advanced web scraping techniques, and an el
 ## ⚙️ Installation Guide
 
 ### 1️⃣ Clone the Repository
-\`\`\`bash
+```bash
 git clone https://github.com/naveen161101/Projects.git
 cd Enhanced Account Intelligence App
-\`\`\`
+```
 
 ### 2️⃣ Install Dependencies
 Python 3.8+ is recommended.
 
-\`\`\`bash
+```bash
 pip install -r requirements.txt
-\`\`\`
+```
 
 ### 3️⃣ Configure Environment Variables
 Create a .env file:
-\`\`\`
+```bash
 AZURE_OPENAI_API_KEY=your-key
 AZURE_OPENAI_API_BASE=https://your-endpoint.openai.azure.com/
 AZURE_OPENAI_DEPLOYMENT_NAME=your-deployment
 AZURE_OPENAI_API_VERSION=2023-03-15-preview
-\`\`\`
+```
 
 ### 4️⃣ Run the App
-\`\`\`bash
+```bash
 streamlit run app.py
-\`\`\`
+```
 
 ---
 
