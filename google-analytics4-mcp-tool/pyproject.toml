@@ -1,0 +1,50 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "google-analytics-mcp"
+version = "0.1.0"
+description = "Model Context Protocol (MCP) server for Google Analytics (GA4) queries"
+readme = "README.md"
+authors = [{ name = "Your Name" }]
+requires-python = ">=3.9"
+license = { text = "MIT" }
+keywords = ["mcp", "model-context-protocol", "google-analytics", "ga4"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+]
+
+dependencies = [
+  "fastmcp>=0.1.0",
+  "google-analytics-data>=0.18.8",
+  "google-auth>=2.29.0",
+  "google-auth-oauthlib>=1.2.0",
+  "pydantic>=2.8.2",
+]
+
+[project.optional-dependencies]
+dev = [
+  "ruff>=0.5.4",
+  "mypy>=1.10.0",
+  "pytest>=8.3.1",
+  "types-requests>=2.32.0.20240712",
+]
+
+[project.scripts]
+ga-mcp = "index:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.mypy]
+python_version = "3.9"
+strict = true
