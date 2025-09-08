@@ -37,8 +37,8 @@ An AI-powered web research tool that delivers actionable account intelligence, w
 
 1. **Clone the repo:**
 
-git clone https://github.com/your-username/enhanced-account-intel.git
-cd enhanced-account-intel
+git clone https://github.com/naveen161101/Projects.git
+cd Enhanced Account Intelligence App
 
 text
 
