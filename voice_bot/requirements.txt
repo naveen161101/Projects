@@ -3,7 +3,6 @@ fastapi
 uvicorn
 requests
 google-genai
-SpeechRecognition 
+SpeechRecognition
 gTTS
-tempfile
-dotenv
+python-dotenv
