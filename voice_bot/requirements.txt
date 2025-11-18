@@ -1,0 +1,9 @@
+streamlit
+fastapi
+uvicorn
+requests
+google-genai
+SpeechRecognition 
+gTTS
+tempfile
+dotenv
