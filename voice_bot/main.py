@@ -5,18 +5,19 @@ import speech_recognition as sr
 from gtts import gTTS
 import base64
 import tempfile
+import io
 
 # ------------------------------
 # Page Layout
 # ------------------------------
 st.set_page_config(page_title="Voice Bot", page_icon="🤖", layout="wide")
-st.title("🤖 Voice Chat Bot")
+st.title("🤖 Voice Chat Bot (Streamlit Cloud Compatible)")
+
 st.sidebar.header("How to Use")
 st.sidebar.write("""
-1. Click **Start Listening** to ask a question.
-2. Allow microphone access.
-3. Wait for bot to respond with audio.
-4. Chat is stored in history.
+1. Upload recorded audio OR click the mic icon in Streamlit to record.
+2. Bot converts speech → text → AI → speech.
+3. Chat history is shown below.
 """)
 
 # ------------------------------
@@ -39,23 +40,25 @@ client = genai.Client(api_key=GEMINI_API_KEY)
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 
-# ------------------------------
-# Record User Voice
-# ------------------------------
-def record_voice():
+
+# ---------------------------------------------------
+#  REPLACED FUNCTION: Record User Voice (Cloud Safe)
+# ---------------------------------------------------
+def record_voice_streamlit(audio_bytes):
     r = sr.Recognizer()
-    with sr.Microphone() as source:
-        st.info("Listening... Speak now.")
-        audio = r.listen(source, phrase_time_limit=10)
-        try:
-            text = r.recognize_google(audio)
-            return text
-        except sr.UnknownValueError:
-            st.warning("Could not understand audio")
-            return None
-        except sr.RequestError as e:
-            st.error(f"Speech Recognition error; {e}")
-            return None
+    try:
+        audio_file = sr.AudioFile(io.BytesIO(audio_bytes))
+        with audio_file as source:
+            audio = r.record(source)
+        text = r.recognize_google(audio)
+        return text
+    except sr.UnknownValueError:
+        st.warning("Could not understand audio")
+        return None
+    except Exception as e:
+        st.error(f"Speech recognition error: {e}")
+        return None
+
 
 # ------------------------------
 # Generate Bot Response
@@ -64,39 +67,49 @@ def get_bot_reply(user_text):
     try:
         response = client.models.generate_content(
             model="gemini-2.5-flash",
-            contents=f"Respond briefly and in a fun, friendly tone with a little humor: {user_text}"
+            contents=f"Respond in a short, fun tone with mild humor: {user_text}"
         )
         return response.text
-    except Exception as e:
-        st.warning("Bot is busy or API error. Please try again later.")
+    except Exception:
+        st.warning("Bot is busy or API error. Please try later.")
         return None
 
-# ------------------------------
-# Convert Text to Speech
-# ------------------------------
+
+# ---------------------------------------------------
+#  REPLACED FUNCTION: Convert Text → Speech
+# ---------------------------------------------------
 def text_to_speech(bot_reply):
     tts = gTTS(bot_reply, lang="en")
     temp_audio = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
     tts.save(temp_audio.name)
+
     audio_bytes = open(temp_audio.name, "rb").read()
     audio_b64 = base64.b64encode(audio_bytes).decode()
 
     audio_html = f"""
         <audio controls autoplay>
             <source src="data:audio/mp3;base64,{audio_b64}" type="audio/mp3">
-            Your browser does not support the audio tag.
         </audio>
     """
     st.markdown(audio_html, unsafe_allow_html=True)
 
+
 # ------------------------------
 # Chat Interface
 # ------------------------------
-if st.button("Start Listening"):
-    user_text = record_voice()
+st.subheader("🎙 Record Your Voice")
+audio_file = st.audio_input("Click to record or upload audio")
+
+if audio_file is not None:
+    audio_bytes = audio_file.read()
+
+    user_text = record_voice_streamlit(audio_bytes)
+
     if user_text:
         st.session_state.chat_history.append(("You", user_text))
+
         bot_reply = get_bot_reply(user_text)
+
         if bot_reply:
             st.session_state.chat_history.append(("Bot", bot_reply))
             text_to_speech(bot_reply)
@@ -104,9 +117,9 @@ if st.button("Start Listening"):
 # ------------------------------
 # Display Chat History
 # ------------------------------
-st.subheader("Chat History")
+st.subheader("💬 Chat History")
 for sender, message in st.session_state.chat_history:
     if sender == "You":
-        st.markdown(f"**You:** {message}")
+        st.markdown(f"**🧑 You:** {message}")
     else:
-        st.markdown(f"**Bot:** {message}")
+        st.markdown(f"**🤖 Bot:** {message}")
