@@ -1,4 +1,1 @@
-gTTS
-SpeechRecognition
-google-genai
-pyaudio
+
