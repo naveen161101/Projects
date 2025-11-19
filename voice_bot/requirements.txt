@@ -1,8 +1,7 @@
-streamlit
-SpeechRecognition
-gTTS
-pydub
-ffmpeg-python
-numpy
-requests
-soundfile
+streamlit>=1.25.0
+google-genai>=0.2.0
+SpeechRecognition>=3.8.1
+gTTS>=2.3.0
+pydub>=0.25.1
+numpy>=1.25.2
+requests>=2.31.0
