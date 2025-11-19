@@ -23,7 +23,7 @@ st.sidebar.write("""
 # Load API key from Secrets
 # ------------------------------
 try:
-    GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
+    GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
 except KeyError:
     st.error("GEMINI_API_KEY is not set in Streamlit Secrets!")
     st.stop()
