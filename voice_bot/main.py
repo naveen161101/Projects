@@ -4,34 +4,32 @@ from google import genai
 import speech_recognition as sr
 from gtts import gTTS
 import base64
-import tempfile
 import io
+import tempfile
 
 # ------------------------------
 # Page Layout
 # ------------------------------
 st.set_page_config(page_title="Voice Bot", page_icon="🤖", layout="wide")
-st.title("🤖 Voice Chat Bot (Streamlit Cloud Compatible)")
+st.title("🤖 Voice Chat Bot")
 
 st.sidebar.header("How to Use")
 st.sidebar.write("""
-1. Upload recorded audio OR click the mic icon in Streamlit to record.
-2. Bot converts speech → text → AI → speech.
-3. Chat history is shown below.
+1. Click **Record Voice** and speak.
+2. Wait for speech-to-text to convert.
+3. Bot replies with voice.
+4. You can record again ANY number of times.
 """)
 
 # ------------------------------
-# Load API key from Secrets
+# Load API Key
 # ------------------------------
 try:
     GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
 except KeyError:
-    st.error("GEMINI_API_KEY is not set in Streamlit Secrets!")
+    st.error("GEMINI_API_KEY is missing in Streamlit Secrets.")
     st.stop()
 
-# ------------------------------
-# Initialize Gemini API Client
-# ------------------------------
 client = genai.Client(api_key=GEMINI_API_KEY)
 
 # ------------------------------
@@ -40,86 +38,95 @@ client = genai.Client(api_key=GEMINI_API_KEY)
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 
-
-# ---------------------------------------------------
-#  REPLACED FUNCTION: Record User Voice (Cloud Safe)
-# ---------------------------------------------------
-def record_voice_streamlit(audio_bytes):
-    r = sr.Recognizer()
-    try:
-        audio_file = sr.AudioFile(io.BytesIO(audio_bytes))
-        with audio_file as source:
-            audio = r.record(source)
-        text = r.recognize_google(audio)
-        return text
-    except sr.UnknownValueError:
-        st.warning("Could not understand audio")
-        return None
-    except Exception as e:
-        st.error(f"Speech recognition error: {e}")
-        return None
-
+if "audio_trigger" not in st.session_state:
+    st.session_state.audio_trigger = 0  # Forces re-render of audio widget
 
 # ------------------------------
-# Generate Bot Response
+# Speech-to-Text
+# ------------------------------
+def audio_to_text(audio_bytes):
+    recognizer = sr.Recognizer()
+    audio_file = sr.AudioFile(io.BytesIO(audio_bytes))
+    with audio_file as source:
+        audio = recognizer.record(source)
+    try:
+        return recognizer.recognize_google(audio)
+    except Exception:
+        return None
+
+# ------------------------------
+# Gemini Bot Response
 # ------------------------------
 def get_bot_reply(user_text):
     try:
         response = client.models.generate_content(
             model="gemini-2.5-flash",
-            contents=f"Respond in a short, fun tone with mild humor: {user_text}"
+            contents=f"Reply conversationally, short, friendly, slight humor: {user_text}"
         )
         return response.text
-    except Exception:
-        st.warning("Bot is busy or API error. Please try later.")
-        return None
+    except:
+        return "Sorry, I'm unable to respond right now."
 
+# ------------------------------
+# Text-To-Speech
+# ------------------------------
+def play_audio(text):
+    tts = gTTS(text)
+    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
+    tts.save(temp_file.name)
 
-# ---------------------------------------------------
-#  REPLACED FUNCTION: Convert Text → Speech
-# ---------------------------------------------------
-def text_to_speech(bot_reply):
-    tts = gTTS(bot_reply, lang="en")
-    temp_audio = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
-    tts.save(temp_audio.name)
-
-    audio_bytes = open(temp_audio.name, "rb").read()
+    audio_bytes = open(temp_file.name, "rb").read()
     audio_b64 = base64.b64encode(audio_bytes).decode()
 
     audio_html = f"""
-        <audio controls autoplay>
-            <source src="data:audio/mp3;base64,{audio_b64}" type="audio/mp3">
-        </audio>
+    <audio controls autoplay>
+        <source src="data:audio/mp3;base64,{audio_b64}" type="audio/mp3">
+    </audio>
     """
     st.markdown(audio_html, unsafe_allow_html=True)
 
-
 # ------------------------------
-# Chat Interface
+# Voice Recording Widget
 # ------------------------------
-st.subheader("🎙 Record Your Voice")
-audio_file = st.audio_input("Click to record or upload audio")
+st.subheader("🎤 Record Your Voice")
 
-if audio_file is not None:
-    audio_bytes = audio_file.read()
+audio_input = st.audio_input(
+    f"Click to Speak (Recording #{st.session_state.audio_trigger + 1})"
+)
 
-    user_text = record_voice_streamlit(audio_bytes)
+if st.button("Process Recording"):
+    if audio_input:
+        audio_bytes = audio_input.getvalue()
 
-    if user_text:
-        st.session_state.chat_history.append(("You", user_text))
+        # Convert speech -> text
+        user_text = audio_to_text(audio_bytes)
 
-        bot_reply = get_bot_reply(user_text)
+        if not user_text:
+            st.warning("Couldn't understand audio. Try again.")
+        else:
+            st.success(f"You said: **{user_text}**")
+            st.session_state.chat_history.append(("You", user_text))
 
-        if bot_reply:
+            # Bot Reply
+            bot_reply = get_bot_reply(user_text)
             st.session_state.chat_history.append(("Bot", bot_reply))
-            text_to_speech(bot_reply)
+
+            # Text-to-speech
+            play_audio(bot_reply)
+
+        # IMPORTANT → Reset widget so user can record again
+        st.session_state.audio_trigger += 1
+        st.rerun()
+
+    else:
+        st.warning("Please record your voice first.")
 
 # ------------------------------
-# Display Chat History
+# Chat History
 # ------------------------------
 st.subheader("💬 Chat History")
-for sender, message in st.session_state.chat_history:
+for sender, msg in st.session_state.chat_history:
     if sender == "You":
-        st.markdown(f"**🧑 You:** {message}")
+        st.markdown(f"**🧑 You:** {msg}")
     else:
-        st.markdown(f"**🤖 Bot:** {message}")
+        st.markdown(f"**🤖 Bot:** {msg}")
