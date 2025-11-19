@@ -1,11 +1,12 @@
 # app.py
 import streamlit as st
 import speech_recognition as sr
-import io
 from gtts import gTTS
 import base64
 import tempfile
+import io
 import uuid
+from google import genai
 
 # ------------------------------
 # App config + styling
@@ -13,28 +14,17 @@ import uuid
 st.set_page_config(page_title="VoiceBot — Personal Voice Assistant", page_icon="🤖", layout="wide")
 st.markdown("""
 <style>
-/* Page background */
 [data-testid="stAppViewContainer"] {
   background: linear-gradient(180deg, #0f172a 0%, #0b1220 100%);
   color: #e6eef8;
   font-family: "Inter", sans-serif;
 }
-
-/* Card */
 .card {
   background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
   border-radius: 14px;
   padding: 18px;
   box-shadow: 0 8px 30px rgba(2,6,23,0.6);
 }
-
-/* Title */
-h1 {
-  font-weight: 700;
-  color: #fff;
-}
-
-/* Buttons */
 .stButton>button {
   background: linear-gradient(90deg,#06b6d4,#60a5fa);
   color: #061224;
@@ -45,66 +35,55 @@ h1 {
 </style>
 """, unsafe_allow_html=True)
 
-# Top layout: title + description
-col1, col2 = st.columns([3, 1])
-with col1:
-    st.title("🤖 VoiceBot — Respond like *you*")
-    st.write("A polished, shareable voice demo: record, ask, and the bot will answer in your voice/personality. Edit your personal profile on the right to make the bot *sound* like you.")
-with col2:
-    st.image("https://raw.githubusercontent.com/streamlit/brand/master/streamlit-mark-color.png", width=64)
+# ------------------------------
+# Load API Key
+# ------------------------------
+try:
+    GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
+except KeyError:
+    st.error("GEMINI_API_KEY not found in Streamlit Secrets!")
+    st.stop()
 
-st.write("---")
+client = genai.Client(api_key=GEMINI_API_KEY)
 
 # ------------------------------
-# Profile editor (sidebar)
+# Sidebar: Profile Editor
 # ------------------------------
 with st.sidebar:
-    st.header("Bot Personality (editable)")
-    st.write("Fill these so the bot replies *as you* — anyone can test without coding.")
-
+    st.header("Bot Personality")
+    st.write("Customize the bot to reply in your voice/personality.")
     default_profile = {
-        "life_story": "I grew up in a small town, studied computer science, and love building useful tools that help people.",
-        "superpower": "Seeing simple solutions for complicated problems.",
-        "growth_areas": "Leadership, public speaking, and deep systems design.",
-        "coworker_misconception": "They think I'm quiet — but I just prefer listening first.",
-        "how_i_push_limits": "I take on projects slightly outside my comfort zone and iterate fast."
+        "life_story": "I grew up loving coding and building fun tools.",
+        "superpower": "Solving complex problems with simple solutions.",
+        "growth_areas": "Leadership, public speaking, and creativity.",
+        "coworker_misconception": "They think I'm quiet but I observe carefully.",
+        "how_i_push_limits": "I take on slightly uncomfortable challenges to grow fast."
     }
-
     if "profile" not in st.session_state:
         st.session_state.profile = default_profile.copy()
 
-    st.session_state.profile["life_story"] = st.text_area("1) Life story (a few sentences)", value=st.session_state.profile["life_story"], height=100)
-    st.session_state.profile["superpower"] = st.text_input("2) #1 Superpower", value=st.session_state.profile["superpower"])
-    st.session_state.profile["growth_areas"] = st.text_input("3) Top 3 areas to grow in (comma-separated)", value=st.session_state.profile["growth_areas"])
-    st.session_state.profile["coworker_misconception"] = st.text_input("4) Coworker misconception", value=st.session_state.profile["coworker_misconception"])
-    st.session_state.profile["how_i_push_limits"] = st.text_area("5) How you push boundaries", value=st.session_state.profile["how_i_push_limits"], height=100)
+    for key in default_profile:
+        if len(default_profile[key]) > 50:
+            st.session_state.profile[key] = st.text_area(key.replace("_"," ").capitalize(), value=st.session_state.profile[key], height=80)
+        else:
+            st.session_state.profile[key] = st.text_input(key.replace("_"," ").capitalize(), value=st.session_state.profile[key])
 
     st.markdown("---")
     st.checkbox("Auto play audio responses", key="auto_play", value=True)
-    st.markdown("---")
-    st.write("Tip: edit the profile to match yourself before submitting the demo link.")
+    st.write("Try sample questions or type/speak your own below!")
 
 # ------------------------------
-# Session vars + reset logic
+# Initialize session state
 # ------------------------------
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
-
 if "audio_trigger" not in st.session_state:
     st.session_state.audio_trigger = 0
-
-if "reset_typed" not in st.session_state:
-    st.session_state.reset_typed = False
-
-# Reset typed input BEFORE it is created
-if st.session_state.reset_typed:
-    st.session_state["typed_question"] = ""
-    st.session_state.reset_typed = False
 
 # ------------------------------
 # Helper: Speech-to-text
 # ------------------------------
-def audio_bytes_to_text(audio_bytes: bytes) -> str | None:
+def audio_bytes_to_text(audio_bytes: bytes):
     r = sr.Recognizer()
     try:
         audio_file = sr.AudioFile(io.BytesIO(audio_bytes))
@@ -112,45 +91,43 @@ def audio_bytes_to_text(audio_bytes: bytes) -> str | None:
             audio = r.record(source)
         text = r.recognize_google(audio)
         return text
-    except sr.UnknownValueError:
+    except Exception:
         return None
+
+# ------------------------------
+# Helper: Call LLM
+# ------------------------------
+def get_llm_reply(user_question: str, profile: dict):
+    """
+    Prompt the LLM to answer in a fun, friendly, slightly humorous way,
+    integrating bot personality from profile.
+    """
+    prompt = f"""
+You are a fun, friendly, and slightly humorous assistant.
+Your personality is:
+- Life Story: {profile['life_story']}
+- Superpower: {profile['superpower']}
+- Growth Areas: {profile['growth_areas']}
+- Coworker Misconception: {profile['coworker_misconception']}
+- How you push limits: {profile['how_i_push_limits']}
+
+User asked: "{user_question}"
+
+Answer the user in a friendly, engaging, and fun tone. Keep it brief.
+"""
+    try:
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt
+        )
+        return response.text
     except Exception as e:
-        st.error(f"Speech -> text failed: {e}")
-        return None
+        return f"Oops! I couldn't think of a response. ({e})"
 
 # ------------------------------
-# Helper: Rule-based response
+# Helper: Text-to-speech
 # ------------------------------
-def generate_reply(user_question: str, profile: dict) -> str:
-    q = user_question.lower().strip()
-
-    if any(k in q for k in ["life story", "about your life", "who are you"]):
-        return profile["life_story"]
-
-    if any(k in q for k in ["superpower", "super power", "strength"]):
-        return f"My #1 superpower is {profile['superpower']}."
-
-    if any(k in q for k in ["top 3", "areas you'd like to grow", "growth areas"]):
-        items = [s.strip() for s in profile["growth_areas"].split(",") if s.strip()]
-        if items:
-            return "The top areas I'd like to grow in are: " + ", ".join(items) + "."
-        return profile["growth_areas"]
-
-    if any(k in q for k in ["misconception", "coworker"]):
-        return profile["coworker_misconception"]
-
-    if any(k in q for k in ["push", "boundaries", "limits"]):
-        return profile["how_i_push_limits"]
-
-    return (
-        f"I'll keep it short: {profile['life_story'].split('.')[0]}. "
-        f"My superpower is {profile['superpower']}."
-    )
-
-# ------------------------------
-# Helper: TTS + render
-# ------------------------------
-def speak_and_render(text: str, autoplay: bool = True):
+def speak_and_render(text: str, autoplay=True):
     tts = gTTS(text, lang="en")
     temp = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
     tts.save(temp.name)
@@ -165,54 +142,44 @@ def speak_and_render(text: str, autoplay: bool = True):
     st.markdown(audio_html, unsafe_allow_html=True)
 
 # ------------------------------
-# UI (Main)
+# Main UI: Chat
 # ------------------------------
-left, right = st.columns([2, 1])
+left, right = st.columns([2,1])
 
 with left:
     st.subheader("🎙 Ask the VoiceBot — speak or type")
-
     audio_input = st.audio_input(f"Click to record (Recording #{st.session_state.audio_trigger + 1})")
-
-    st.write("Or type your question:")
     typed = st.text_input("Type question here", key="typed_question")
-
-    c1, c2 = st.columns([1, 1])
-    process_btn = c1.button("Send Question (Process)")
-    clear_btn = c2.button("Clear Chat")
+    colp1, colp2 = st.columns([1,1])
+    process_btn = colp1.button("Send Question")
+    clear_btn = colp2.button("Clear Chat")
 
     if clear_btn:
         st.session_state.chat_history = []
-        st.experimental_rerun()
+        st.session_state.audio_trigger = 0
 
     if process_btn:
         user_question = None
-
-        # Audio
-        if audio_input and audio_input.getbuffer().nbytes > 0:
-            st.info("Transcribing...")
-            text = audio_bytes_to_text(audio_input.getvalue())
+        if audio_input is not None and audio_input.getbuffer().nbytes > 0:
+            audio_bytes = audio_input.getvalue()
+            text = audio_bytes_to_text(audio_bytes)
             if text:
                 user_question = text
-
-        # Typed fallback
+            else:
+                st.warning("Couldn't transcribe audio. Try typing your question.")
         if not user_question and typed:
             user_question = typed
 
         if user_question:
             st.session_state.chat_history.append(("You", user_question))
-            reply = generate_reply(user_question, st.session_state.profile)
+            reply = get_llm_reply(user_question, st.session_state.profile)
             st.session_state.chat_history.append(("Bot", reply))
-            speak_and_render(reply, st.session_state.auto_play)
-
+            speak_and_render(reply, autoplay=st.session_state.auto_play)
             st.session_state.audio_trigger += 1
-            st.session_state.reset_typed = True
-            st.experimental_rerun()
-        else:
-            st.warning("No input detected.")
+            st.session_state["typed_question"] = ""  # reset input
 
 with right:
-    st.subheader("✨ Quick Questions")
+    st.subheader("✨ Sample Questions")
     samples = [
         "What should we know about your life story in a few sentences?",
         "What’s your #1 superpower?",
@@ -223,23 +190,20 @@ with right:
     for s in samples:
         if st.button(s, key=f"sample_{uuid.uuid4()}"):
             st.session_state.chat_history.append(("You", s))
-            reply = generate_reply(s, st.session_state.profile)
+            reply = get_llm_reply(s, st.session_state.profile)
             st.session_state.chat_history.append(("Bot", reply))
-            speak_and_render(reply, st.session_state.auto_play)
-            st.experimental_rerun()
+            speak_and_render(reply, autoplay=st.session_state.auto_play)
 
 # ------------------------------
-# Chat History
+# Chat History display
 # ------------------------------
 st.markdown("---")
 st.subheader("💬 Chat History")
-
 if not st.session_state.chat_history:
-    st.info("No conversation yet.")
+    st.info("No conversation yet — record or type a question to start.")
 else:
     for who, msg in st.session_state.chat_history[::-1]:
-        label = "🧑 You:" if who == "You" else "🤖 Bot:"
-        st.markdown(f"<div class='card'><strong>{label}</strong> {msg}</div>", unsafe_allow_html=True)
-
-st.markdown("---")
-st.caption("Built for easy sharing — no API keys needed.")
+        if who == "You":
+            st.markdown(f"<div class='card'><strong>🧑 You:</strong> {msg}</div>", unsafe_allow_html=True)
+        else:
+            st.markdown(f"<div class='card'><strong>🤖 Bot:</strong> {msg}</div>", unsafe_allow_html=True)
