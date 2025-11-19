@@ -1,41 +1,43 @@
 # app.py
 import streamlit as st
-import speech_recognition as sr
 import io
 from gtts import gTTS
 import base64
 import tempfile
 import uuid
 from google import genai
+import os
 
+try:
+    GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
+except KeyError:
+    st.error("GEMINI_API_KEY is not set in Streamlit Secrets!")
+    st.stop()
+
+client = genai.Client(api_key=GEMINI_API_KEY)
 # ------------------------------
 # App config + styling
 # ------------------------------
-st.set_page_config(page_title="VoiceBot — Personal Voice Assistant", page_icon="🤖", layout="wide")
+st.set_page_config(
+    page_title="VoiceBot — Personal Voice Assistant",
+    page_icon="🤖",
+    layout="wide"
+)
+
 st.markdown("""
 <style>
-/* Page background */
 [data-testid="stAppViewContainer"] {
   background: linear-gradient(180deg, #0f172a 0%, #0b1220 100%);
   color: #e6eef8;
   font-family: "Inter", sans-serif;
 }
-
-/* Card */
 .card {
   background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
   border-radius: 14px;
   padding: 18px;
   box-shadow: 0 8px 30px rgba(2,6,23,0.6);
 }
-
-/* Title */
-h1 {
-  font-weight: 700;
-  color: #fff;
-}
-
-/* Buttons */
+h1 { font-weight: 700; color: #fff; }
 .stButton>button {
   background: linear-gradient(90deg,#06b6d4,#60a5fa);
   color: #061224;
@@ -50,19 +52,22 @@ h1 {
 # Gemini API Key
 # ------------------------------
 try:
-    GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
-except KeyError:
-    st.error("GEMINI_API_KEY is not set in Streamlit Secrets!")
+    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+    if not GEMINI_API_KEY:
+        GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
+except (KeyError, FileNotFoundError):
+    st.error("GEMINI_API_KEY is not set in environment variables or Streamlit Secrets!")
     st.stop()
 
 client = genai.Client(api_key=GEMINI_API_KEY)
 
 # ------------------------------
-# Profile editor (sidebar)
+# Sidebar: Bot Profile
 # ------------------------------
 with st.sidebar:
     st.header("Bot Personality (editable)")
-    st.write("Fill these so the bot replies *as you* — anyone can test without coding.")
+    st.write("Fill these so the bot replies *as you* — no coding needed.")
+
     default_profile = {
         "life_story": "I grew up in a small town, studied computer science, and love building useful tools that help people.",
         "superpower": "Seeing simple solutions for complicated problems.",
@@ -89,62 +94,82 @@ if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 if "audio_trigger" not in st.session_state:
     st.session_state.audio_trigger = 0
+if "input_key" not in st.session_state:
+    st.session_state.input_key = 0
+if "pending_audio" not in st.session_state:
+    st.session_state.pending_audio = None
 
 # ------------------------------
 # Helpers
 # ------------------------------
-def audio_bytes_to_text(audio_bytes: bytes) -> str | None:
-    r = sr.Recognizer()
+def audio_to_text_gemini(audio_bytes: bytes) -> str | None:
+    """
+    Transcribe audio using Gemini API.
+    """
     try:
-        audio_file = sr.AudioFile(io.BytesIO(audio_bytes))
-        with audio_file as source:
-            audio = r.record(source)
-        text = r.recognize_google(audio)
-        return text
-    except sr.UnknownValueError:
-        return None
+        audio_b64 = base64.b64encode(audio_bytes).decode()
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=[{
+                "role": "user",
+                "parts": [
+                    {"inline_data": {"mime_type": "audio/wav", "data": audio_b64}},
+                    {"text": "Transcribe this audio exactly. Return only the transcribed text."}
+                ]
+            }]
+        )
+        return response.text.strip()
     except Exception as e:
-        st.error(f"Speech -> text failed: {e}")
+        st.error(f"Audio transcription failed: {e}")
         return None
 
 def generate_reply_llm(user_question: str, profile: dict) -> str:
     """
-    Use Gemini LLM to respond in a fun, friendly way.
+    Generate a short, fun, friendly reply using Gemini.
     """
     prompt = f"""
-    You are a fun and friendly assistant that answers like a person. 
-    Use the following profile to respond to user questions naturally and playfully:
+You are a fun assistant that replies like a human, making jokes and keeping it brief.
+Profile:
+Life story: {profile['life_story']}
+Superpower: {profile['superpower']}
+Growth areas: {profile['growth_areas']}
+Coworker misconception: {profile['coworker_misconception']}
+Push limits: {profile['how_i_push_limits']}
 
-    Life story: {profile['life_story']}
-    Superpower: {profile['superpower']}
-    Growth areas: {profile['growth_areas']}
-    Coworker misconception: {profile['coworker_misconception']}
-    How they push limits: {profile['how_i_push_limits']}
-
-    User question: {user_question}
-    Reply in a short, friendly, slightly humorous way.
-    """
+User question: {user_question}
+Reply in a short, humorous, friendly way.
+"""
     try:
-        response = client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
+        response = client.models.generate_content(model="gemini-2.5-pro", contents=prompt)
         return response.text
-    except Exception as e:
-        st.warning("LLM is busy or API error. Please try again later.")
-        return "Oops! I couldn't think of a reply right now 😅"
+    except Exception:
+        return "Oops! I couldn't think of a reply right now 😅 Try again!"
 
 def speak_and_render(text: str, autoplay: bool = True):
-    tts = gTTS(text, lang="en")
-    temp = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
-    tts.save(temp.name)
-    audio_bytes = open(temp.name, "rb").read()
-    audio_b64 = base64.b64encode(audio_bytes).decode()
-    autoplay_attr = "autoplay" if autoplay else ""
-    audio_html = f"""
+    """
+    Convert text to speech and render audio player.
+    """
+    try:
+        tts = gTTS(text, lang="en")
+        temp = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
+        tts.save(temp.name)
+        with open(temp.name, "rb") as f:
+            audio_bytes = f.read()
+        audio_b64 = base64.b64encode(audio_bytes).decode()
+        autoplay_attr = "autoplay" if autoplay else ""
+        audio_html = f"""
         <audio controls {autoplay_attr} style="width:100%;">
             <source src="data:audio/mp3;base64,{audio_b64}" type="audio/mp3">
             Your browser does not support the audio element.
         </audio>
-    """
-    st.markdown(audio_html, unsafe_allow_html=True)
+        """
+        st.markdown(audio_html, unsafe_allow_html=True)
+        try:
+            os.unlink(temp.name)
+        except:
+            pass
+    except Exception as e:
+        st.error(f"Text-to-speech failed: {e}")
 
 # ------------------------------
 # Main UI
@@ -153,8 +178,13 @@ left, right = st.columns([2, 1])
 
 with left:
     st.subheader("🎙 Ask the VoiceBot — speak or type")
+    
+    if st.session_state.pending_audio:
+        speak_and_render(st.session_state.pending_audio, autoplay=st.session_state.auto_play)
+        st.session_state.pending_audio = None
+    
     audio_input = st.audio_input(f"Click to record (Recording #{st.session_state.audio_trigger + 1})")
-    typed = st.text_input("Type question here", key="typed_question")
+    typed = st.text_input("Type question here", key=f"typed_question_{st.session_state.input_key}")
 
     colp1, colp2 = st.columns([1, 1])
     with colp1:
@@ -164,13 +194,18 @@ with left:
 
     if clear_btn:
         st.session_state.chat_history = []
+        st.rerun()
 
     if process_btn:
         user_question = None
+        is_audio_input = False
+        
         if audio_input is not None and audio_input.getbuffer().nbytes > 0:
-            text = audio_bytes_to_text(audio_input.getvalue())
+            with st.spinner("Transcribing audio..."):
+                text = audio_to_text_gemini(audio_input.getvalue())
             if text:
                 user_question = text
+                is_audio_input = True
             else:
                 st.warning("Couldn't transcribe audio. Try again or type your question.")
         if not user_question and typed:
@@ -178,12 +213,19 @@ with left:
 
         if user_question:
             st.session_state.chat_history.append(("You", user_question))
-            reply = generate_reply_llm(user_question, st.session_state.profile)
+            with st.spinner("Thinking..."):
+                reply = generate_reply_llm(user_question, st.session_state.profile)
             st.session_state.chat_history.append(("Bot", reply))
-            speak_and_render(reply, autoplay=st.session_state.auto_play)
-            st.session_state.audio_trigger += 1
-            # ✅ Clear typed input safely
-            st.session_state.typed_question = ""
+            
+            st.session_state.pending_audio = reply
+            
+            if is_audio_input:
+                st.session_state.audio_trigger += 1
+                st.session_state.input_key += 1
+                st.rerun()
+            else:
+                speak_and_render(reply, autoplay=st.session_state.auto_play)
+                st.session_state.input_key += 1
         else:
             st.warning("No input found. Please record or type a question.")
 
@@ -191,8 +233,8 @@ with right:
     st.subheader("✨ Quick Questions")
     samples = [
         "What should we know about your life story in a few sentences?",
-        "What’s your #1 superpower?",
-        "What are the top 3 areas you’d like to grow in?",
+        "What's your #1 superpower?",
+        "What are the top 3 areas you'd like to grow in?",
         "What misconception do your coworkers have about you?",
         "How do you push your boundaries and limits?"
     ]
