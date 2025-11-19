@@ -1,5 +1,8 @@
 streamlit
 SpeechRecognition
 gTTS
-google-genai
-pyaudio
+pydub
+ffmpeg-python
+numpy
+requests
+soundfile
