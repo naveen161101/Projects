@@ -1,10 +1,5 @@
 streamlit
-google-genai
-requests
-pydub
-pynacl
-gTTS
 SpeechRecognition
-uvicorn
-fastapi
-python-dotenv
+gTTS
+google-genai
+pyaudio
